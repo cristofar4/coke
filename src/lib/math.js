@@ -67,5 +67,9 @@ export const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 export const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** phones, and tablets held upright, use the compact (poster-scaled) composition */
+export const COMPACT_QUERY = '(max-width: 759px), (max-width: 1023px) and (orientation: portrait)';
+export const isCompact = () => typeof window !== 'undefined' && window.matchMedia(COMPACT_QUERY).matches;
+
 export const isFinePointer = () =>
   typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;

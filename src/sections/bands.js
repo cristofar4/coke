@@ -1,6 +1,6 @@
 import { Ribbon, paperPattern } from '../lib/ribbon.js';
 import { registerRibbon } from '../lib/field.js';
-import { clamp, lerp, smooth, TAU, crScalar, sampleSplineByLength } from '../lib/math.js';
+import { clamp, lerp, smooth, TAU, crScalar, sampleSplineByLength, isCompact } from '../lib/math.js';
 
 const RED = [224, 14, 30];
 const RED_BACK = [196, 8, 24];
@@ -58,7 +58,7 @@ export class Band {
 
   layout() {
     const W = (this.W = this.section.clientWidth);
-    const mobile = (this.mobile = W < 760);
+    const mobile = (this.mobile = isCompact());
     const g = (this.g = this.cfg.geometry(W, mobile, this));
     this.dpr = Math.min(window.devicePixelRatio || 1, Band.maxDpr);
     this.section.style.setProperty('--band-h', `${g.height}px`);
@@ -166,33 +166,11 @@ export function peopleBand(img) {
     front: RED,
     back: RED_BACK,
     geometry(W, mobile) {
-      if (mobile) {
-        const T = clamp(W * 1.32, 430, 640);
-        const vb = 0.045;
-        return {
-          T,
-          height: T * 1.02,
-          ext: T * 0.32,
-          x0: -0.03 * W,
-          x1: 1.03 * W,
-          spineY: [0.02, -0.01, -0.02, 0.0, 0.02],
-          ends: (u) => 0.4 * (1 - smooth(u / 0.07)),
-          layers: [
-            {
-              img,
-              u0: 0.0,
-              u1: 1.0,
-              vMin: (u) => lerp(0.47, 0.4, u),
-              vMax: () => 1 - vb,
-              rect: [0.0, 1.0, 0.4, 1 - vb],
-              focusX: 0.42,
-              focusY: 0.35,
-            },
-          ],
-        };
-      }
-      const T = clamp(W * 0.31, 330, 560);
+      // phones follow the same poster composition, just scaled to the width
+      const T = mobile ? clamp(W * 0.44, 160, 440) : clamp(W * 0.31, 330, 560);
       const vb = 0.07;
+      const d0 = mobile ? 0.12 : 0.125;
+      const d1 = mobile ? 0.46 : 0.31;
       return {
         T,
         height: T * 1.04,
@@ -205,12 +183,12 @@ export function peopleBand(img) {
         layers: [
           {
             img,
-            u0: 0.12,
+            u0: d0 - 0.005,
             u1: 1.0,
             vMin: (u) => vb + 0.012 * Math.sin(u * 9),
             // the red swoosh sweeping under the photo on the left
-            vMax: (u) => vb + (1 - 2 * vb) * Math.pow(smooth((u - 0.125) / 0.31), 0.8),
-            rect: [0.155, 1.0, vb - 0.03, 1 - vb],
+            vMax: (u) => vb + (1 - 2 * vb) * Math.pow(smooth((u - d0) / d1), 0.8),
+            rect: [mobile ? 0.17 : 0.155, 1.0, vb - 0.03, 1 - vb],
             focusY: 0.3,
           },
         ],
@@ -231,19 +209,20 @@ export function iconBand(img) {
     back: RED_BACK,
     can,
     geometry(W, mobile) {
-      const vb = mobile ? 0.04 : 0.06;
+      const vb = mobile ? 0.055 : 0.06;
       if (mobile) {
-        const T = clamp(W * 1.42, 470, 660);
-        Object.assign(can, { u0: 0, u1: 1, vMin: () => vb, vMax: () => 0.56, rect: [0, 1, vb, 0.56], fade: null });
+        // phones: the can fills the whole band; the copy sits underneath it
+        const T = clamp(W * 0.42, 160, 420);
+        Object.assign(can, { u0: 0, u1: 1, vMin: () => vb, vMax: () => 1 - vb, rect: [0, 1, vb, 1 - vb], fade: null });
         return {
           T,
           height: T * 1.0,
-          ext: T * 0.32,
-          x0: -0.03 * W,
+          ext: T * 0.34,
+          x0: -0.01 * W,
           x1: 1.03 * W,
-          spineY: [0.0, 0.015, 0.0, -0.015, 0.0],
-          ends: (u) => 0.4 * smooth((u - 0.93) / 0.07),
-          layers: [{ rgb: PAPER, u0: 0, u1: 1, vMin: () => 0.53, vMax: () => 1 - vb }, can],
+          spineY: [0.03, -0.02, -0.04, -0.01, 0.03, 0.02, -0.02],
+          ends: (u) => -Math.PI * 0.62 * (1 - smooth(u / 0.045)) + 0.35 * smooth((u - 0.93) / 0.07),
+          layers: [can],
         };
       }
       const T = clamp(W * 0.3, 320, 540);
@@ -279,15 +258,15 @@ export function createBand(content) {
       const contentH = content.offsetHeight;
       const T = Math.max(contentH + pad * 2, mobile ? 0 : W * 0.33);
       const edge = mobile ? 3.5 / T : 4 / T;
-      const curlL = mobile ? 0.06 : 0.085;
-      const curlR = mobile ? 0.94 : 0.915;
-      const curl = mobile ? 0.5 : 0.86;
+      const curlL = mobile ? 0.1 : 0.085;
+      const curlR = mobile ? 0.9 : 0.915;
+      const curl = mobile ? 0.8 : 0.86;
       return {
         T,
         height: T * 1.0,
         ext: Math.max(90, T * 0.22),
-        x0: (mobile ? -0.02 : 0.015) * W,
-        x1: (mobile ? 1.02 : 0.985) * W,
+        x0: (mobile ? 0.0 : 0.015) * W,
+        x1: (mobile ? 1.0 : 0.985) * W,
         spineY: [0.02, 0.0, -0.008, 0.0, 0.006, 0.0, -0.02],
         texture: true,
         ends: (u) => -Math.PI * curl * (1 - smooth(u / curlL)) + Math.PI * curl * smooth((u - curlR) / (1 - curlR)),
@@ -326,7 +305,7 @@ export class Strand {
     this.canvas.height = Math.round(this.H * this.dpr);
     const p = this.pts;
     const H = this.H;
-    const m = W < 760;
+    const m = isCompact();
     const coords = [
       [0.035, 0.86],
       [0.012, 0.6],

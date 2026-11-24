@@ -261,6 +261,32 @@ export class Ribbon {
     ctx.stroke();
   }
 
+  /** red rims along both edges of back-facing spans, so a curl reads as the inside of a ribbon */
+  drawBackRim(ctx, u0, u1) {
+    const { n, ax, ay, bx, by, cs } = this;
+    const i0 = Math.max(0, Math.floor(clamp(u0) * (n - 1)));
+    const i1 = Math.min(n - 1, Math.floor(clamp(u1) * (n - 1)));
+    const c = this.front;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    for (const [ex, ey] of [
+      [ax, ay],
+      [bx, by],
+    ]) {
+      ctx.beginPath();
+      let pen = false;
+      for (let i = i0; i <= i1; i++) {
+        if (cs[i] < -0.2) {
+          if (!pen) ctx.moveTo(ex[i], ey[i]);
+          else ctx.lineTo(ex[i], ey[i]);
+          pen = true;
+        } else pen = false;
+      }
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},0.85)`;
+      ctx.stroke();
+    }
+  }
+
   _regionPath(ctx, L) {
     const P = this._p;
     const { n, u } = this;

@@ -106,8 +106,8 @@ function boot(peopleImg, canImg) {
   const cursor = initCursor();
 
   // the people band is on screen at load: it unfurls as part of the intro
-  people.gate = reduced ? 1 : 0;
-  icon.gate = create.gate = 1;
+  people.gate = icon.gate = reduced ? 1 : 0;
+  create.gate = 1;
 
   /* ---- "An icon, up close": scroll pushes the camera into the can ---- */
   let sprayed = false;
@@ -169,8 +169,7 @@ function boot(peopleImg, canImg) {
     bands.forEach((b) => b.layout());
     // tuck the people band under the bottle, as in the poster
     const g = people.g;
-    const overlapTop = hero.bottleBottom() - hero.bh * (people.mobile ? 0.1 : 0.15);
-    const mt = overlapTop - hero.H - (g.height - g.T) / 2 - g.T * 0.035;
+    const mt = hero.bandTop() - hero.H - (g.height - g.T) / 2 - g.T * 0.035;
     people.section.style.marginTop = `${mt.toFixed(1)}px`;
     strand.layout();
     fizz.resize();
@@ -274,15 +273,17 @@ function boot(peopleImg, canImg) {
   });
 
   /* ---- sound toggle ---- */
-  const st = $('.sound-toggle');
+  const toggles = $$('.sound-toggle');
   const setSound = (on) => {
     sound.set(on);
-    st.setAttribute('aria-pressed', String(on));
-    st.querySelector('.sound-toggle__label').textContent = on ? 'Sound on' : 'Sound off';
-    st.classList.toggle('is-on', on);
+    toggles.forEach((st) => {
+      st.setAttribute('aria-pressed', String(on));
+      st.querySelector('.sound-toggle__label').textContent = on ? 'Sound on' : 'Sound off';
+      st.classList.toggle('is-on', on);
+    });
     if (on) sound.fizz(0.6);
   };
-  st.addEventListener('click', () => setSound(!sound.enabled));
+  toggles.forEach((st) => st.addEventListener('click', () => setSound(!sound.enabled)));
 
   /* ---- hero headline: letters that react like bubbles ---- */
   const title = $('.hero__title');
@@ -374,6 +375,7 @@ function boot(peopleImg, canImg) {
       },
     });
     tl.to(people, { gate: 1, duration: 2.2, ease: 'power2.inOut' }, at + 0.9);
+    tl.to(icon, { gate: 1, duration: 2, ease: 'power2.inOut' }, at + 1.5);
     tl.call(() => {
       lenis && lenis.start();
       measureChars();

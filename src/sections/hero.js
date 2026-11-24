@@ -1,7 +1,7 @@
 import { Ribbon } from '../lib/ribbon.js';
 import { Carbonation } from '../lib/fizz.js';
 import { registerRibbon, pointer } from '../lib/field.js';
-import { clamp, lerp, smooth, TAU, sampleSplineByLength, damp } from '../lib/math.js';
+import { clamp, lerp, smooth, TAU, sampleSplineByLength, damp, isCompact } from '../lib/math.js';
 
 // Where things sit inside bottle.webp (normalised 0..1)
 const LABEL = { x: 0.95, top: 0.49, bottom: 0.79 };
@@ -36,7 +36,7 @@ export class Hero {
       front: [226, 14, 30],
       back: [244, 239, 235],
       backSpec: 0.35,
-      ambientBack: 0.8,
+      ambientBack: 0.9,
       sim: { pinStart: true, c2: 5400, k: 16, damp: 2.1, maxDisp: 160, tk: 22 },
       simNodes: 80,
     });
@@ -75,14 +75,25 @@ export class Hero {
     const dpr = (this.dpr = Math.min(Hero.maxDpr, window.devicePixelRatio || 1));
     this.canvas.width = Math.round(W * dpr);
     this.canvas.height = Math.round(H * dpr);
-    this.mobile = W < 760;
+    this.mobile = isCompact();
     this.bx = this.bottle.offsetLeft;
     this.by = this.bottle.offsetTop;
     this.bw = this.bottle.offsetWidth;
     this.bh = this.bottle.offsetHeight;
     this.carb.resize(this.bw, this.bh);
-    this.h0 = (LABEL.bottom - LABEL.top) * this.bh * 0.5;
-    this.root.style.setProperty('--ribbon-font', `${Math.max(14, this.h0 * 0.34).toFixed(1)}px`);
+    // on phones the ribbon is its own band crossing in front of a tilted bottle
+    this.h0 = this.mobile ? W * 0.084 : (LABEL.bottom - LABEL.top) * this.bh * 0.5;
+    const font = this.mobile ? Math.max(13, this.h0 * 0.5) : Math.max(14, this.h0 * 0.34);
+    this.root.style.setProperty('--ribbon-font', `${font.toFixed(1)}px`);
+  }
+
+  /** where the first band should start (hero coordinates) so it tucks under the bottle */
+  bandTop() {
+    if (this.mobile) return this.W * 0.885;
+    // never let the band climb over the headline block
+    const copyBottom = this.copy ? this.copy.offsetTop + this.copy.offsetHeight + 28 : 0;
+    const cueBottom = this.cue ? this.cue.offsetTop + this.cue.offsetHeight + 16 : 0;
+    return Math.max(this.bottleBottom() - this.bh * 0.15, copyBottom, cueBottom);
   }
 
   /** bottle bottom in page-section coordinates (used to tuck the next band under it) */
@@ -112,6 +123,7 @@ export class Hero {
   }
 
   spine() {
+    if (this.mobile) return this.spineMobile();
     const A = this.anchor();
     const W = this.W;
     const H = this.H;
@@ -135,18 +147,52 @@ export class Hero {
     set(7, W + dx * 0.07, A.y - rise * 0.72);
     set(8, W - dx * 0.07, A.y - rise * 0.68);
     set(9, W - dx * 0.22, A.y - rise * 0.74);
+    this.measure(0.06);
+  }
+
+  spineMobile() {
+    const W = this.W;
+    const p = this.pts;
+    const coords = [
+      [-0.16, 0.99],
+      [0.02, 0.875],
+      [0.3, 0.775],
+      [0.6, 0.735],
+      [0.83, 0.668],
+      [0.95, 0.615],
+      [1.03, 0.65],
+      [1.01, 0.75],
+      [0.9, 0.8],
+      [0.77, 0.81],
+    ];
+    coords.forEach(([x, y], i) => {
+      p[i][0] = x * W;
+      p[i][1] = y * W;
+    });
+    this.measure(null);
+  }
+
+  /** sample the spine, then place the words relative to the ribbon's on-screen run */
+  measure(uStart) {
+    const W = this.W;
     const r = this.ribbon;
-    sampleSplineByLength(p, r.x0, r.y0);
-    // where does the ribbon leave the screen? everything is placed relative to that
+    sampleSplineByLength(this.pts, r.x0, r.y0);
     let e = r.n - 1;
+    let s0 = -1;
+    let iMax = 0;
+    for (let i = 0; i < r.n; i++) {
+      if (s0 < 0 && r.x0[i] >= 0) s0 = i;
+      if (r.x0[i] > r.x0[iMax]) iMax = i;
+    }
     for (let i = 0; i < r.n; i++) {
       if (r.x0[i] >= W - 2) {
         e = i;
         break;
       }
     }
-    this.uEdge = r.u[e];
-    this.uStart = 0.06;
+    // the curl starts where the ribbon leaves the screen, or where it turns back if it never does
+    this.uEdge = this.mobile ? Math.max(0.3, r.u[iMax] - 0.05) : r.u[e];
+    this.uStart = uStart ?? r.u[Math.max(0, s0)];
     const span = this.uEdge - this.uStart;
     for (const w of this.words) w.u = this.uStart + span * w.f;
     this.dividerF.forEach((f, k) => (this.dividers[k] = this.uStart + span * f));
@@ -163,7 +209,7 @@ export class Hero {
 
     // bottle: drop-in, idle float, pointer parallax, scroll parallax
     this.bt.y = s.dy * this.H * 1.15 + Math.sin(t * 0.9) * 6 * s.float + this.my * 10 * s.float + sc * 0.16;
-    this.bt.rot = s.rot + Math.sin(t * 0.66 + 1) * 0.8 * s.float + this.mx * 2.4 * s.float;
+    this.bt.rot = (this.mobile ? 6 : 0) + s.rot + Math.sin(t * 0.66 + 1) * 0.8 * s.float + this.mx * 2.4 * s.float;
     this.inner.style.transform = `translate3d(0, ${this.bt.y.toFixed(2)}px, 0) rotate(${this.bt.rot.toFixed(3)}deg)`;
 
     // copy drifts away as you scroll
@@ -180,14 +226,18 @@ export class Hero {
     this.spine();
     r.drawTo = unspool;
     const ue = this.uEdge;
+    const us = this.uStart;
+    const mob = this.mobile;
     r.build({
       disp: (u) => Math.sin(TAU * (u * 1.25) - t * 1.2) * 7 * smooth(u / 0.3) + Math.sin(TAU * (u * 2.4) + t * 0.7) * 2.5 * smooth(u / 0.5),
       width: (u) => {
-        const base = h0 * lerp(1, 0.6, smooth(u / (ue * 0.85)));
+        const base = mob ? h0 * lerp(1.05, 0.9, smooth(u / ue)) : h0 * lerp(1, 0.6, smooth(u / (ue * 0.85)));
         return base * (1 + 0.12 * smooth((u - ue) / 0.12));
       },
       twist: (u) => {
         let th = 0.13 * Math.sin(TAU * (u * 1.15) - t * 1.05) * smooth(u / 0.35);
+        // phones: the tail curls in from the left edge, showing its back
+        if (mob) th -= Math.PI * 0.75 * (1 - smooth(u / (us + 0.05)));
         // the ribbon rolls over the edge of the screen and comes back showing its paper-white back
         th += (Math.PI + 0.38 * Math.sin(t * 0.8)) * smooth((u - ue + 0.01) / 0.13) - 0.3 * smooth((u - ue - 0.16) / 0.12);
         if (unspool < 1) {
@@ -213,11 +263,13 @@ export class Hero {
     if (end > split) r.drawBase(ctx, split - 0.01, end);
     r.drawBase(ctx, 0, Math.min(end, split));
     r.drawEdges(ctx, 0.03, Math.min(end, split - 0.04), 0.2);
+    // the inside of the curl: a red rim where the ribbon's edges roll under
+    if (end > split) r.drawBackRim(ctx, split - 0.02, end);
     // hairline dividers between the words
     ctx.lineWidth = 1;
     for (const du of this.dividers) {
       const a = clamp((end - du - 0.02) / 0.06);
-      if (a <= 0 || this.mobile) continue;
+      if (a <= 0) continue;
       r.point(du, 0.2, this.P);
       const x1 = this.P.x;
       const y1 = this.P.y;
@@ -231,7 +283,6 @@ export class Hero {
   }
 
   placeWords(dt) {
-    if (this.mobile) return;
     const end = this.state.unspool;
     for (const w of this.words) {
       const target = end > w.u + 0.06 ? 1 : 0;

@@ -27,6 +27,8 @@ npm run preview
 | **Menu** | A full-screen ribbon unrolls diagonally across the viewport. |
 | **Sound (opt-in)** | Fizz, the "pssht" of the can and the plucks are generated live with WebAudio. There are no audio files. |
 
+Responsive: phones, and tablets held upright, follow the mobile poster. The bottle tilts, the ribbon crosses in front of it carrying the navigation, the can fills its band with the copy underneath, and the card maker becomes a single column with the card above the button. Landscape tablets and desktops use the wide composition.
+
 Accessibility: everything is real HTML (headings, links, a proper form with radio buttons). With `prefers-reduced-motion`, ribbons render already unrolled and still, and the preloader fades. Touch devices get tap ripples instead of grabbing. A frame-time governor lowers canvas resolution on devices that struggle.
 
 ## How the ribbons work
