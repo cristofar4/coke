@@ -1,9 +1,7 @@
-import '@fontsource/montserrat/300.css';
-import '@fontsource/montserrat/400.css';
-import '@fontsource/montserrat/500.css';
+import '@fontsource/instrument-serif/400.css';
+import '@fontsource/instrument-serif/400-italic.css';
+import '@fontsource-variable/inter-tight';
 import '@fontsource/norican/400.css';
-import '@fontsource/cormorant-garamond/500-italic.css';
-import '@fontsource/cormorant-garamond/600-italic.css';
 import './styles/main.css';
 
 import gsap from 'gsap';
@@ -11,240 +9,253 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SplitText } from 'gsap/SplitText';
 import Lenis from 'lenis';
 
-import bottleUrl from './assets/bottle.webp';
-import maskUrl from './assets/bottle-liquid-mask.png';
-import peopleUrl from './assets/people.webp';
-import canUrl from './assets/can.webp';
-
-import { initPointer, updateField, onField, pointer } from './lib/field.js';
-import { Fizz } from './lib/fizz.js';
+import { createScene } from './gl/scene.js';
+import { Surface } from './gl/surface.js';
+import { Bubbles } from './gl/bubbles.js';
+import { paintTitle, titleWaterline } from './gl/title.js';
+import { FizzChapter } from './sections/fizz.js';
+import { ShapeChapter } from './sections/shape.js';
+import { CapChapter } from './sections/cap.js';
+import { createTilt } from './lib/tilt.js';
 import { sound } from './lib/sound.js';
-import { prefersReducedMotion, clamp, rand } from './lib/math.js';
-import { Hero } from './sections/hero.js';
-import { Band, peopleBand, iconBand, createBand, Strand } from './sections/bands.js';
-import { MomentMaker } from './sections/moment.js';
-import { Menu, Loader } from './sections/menu.js';
-import { initCursor } from './sections/cursor.js';
+import { prefersReducedMotion, isFinePointer, clamp, rand, damp } from './lib/math.js';
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const reduced = prefersReducedMotion();
 const root = document.documentElement;
-root.classList.toggle('reduced-motion', reduced);
+const reduced = prefersReducedMotion();
+const fine = isFinePointer();
+const small = matchMedia('(max-width: 860px)').matches;
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
 
-/* ---------------- assets ---------------- */
-let loaded = 0;
-const TOTAL = 4;
-const loader = new Loader($('.loader'), { reduced });
-const tick = () => loader.setProgress(++loaded / TOTAL);
-const loadImg = (url) =>
-  new Promise((res) => {
-    const i = new Image();
-    i.decoding = 'async';
-    i.onload = i.onerror = () => {
-      tick();
-      res(i);
-    };
-    i.src = url;
-  });
-
-// paint the preloader while we wait
-let booted = false;
-const preTick = (time) => loader.update(time);
-gsap.ticker.add(preTick);
-
-const fontsReady = Promise.all([
-  document.fonts.load('300 40px Montserrat'),
-  document.fonts.load('400 20px Montserrat'),
-  document.fonts.load('40px Norican'),
-  document.fonts.load('italic 600 30px "Cormorant Garamond"'),
-])
-  .catch(() => {})
-  .then(() => document.fonts.ready)
-  .then(tick);
-
-const minTime = new Promise((r) => setTimeout(r, reduced ? 0 : 900));
-
-Promise.all([loadImg(peopleUrl), loadImg(canUrl), loadImg(bottleUrl), fontsReady, minTime]).then(([people, can]) => boot(people, can));
+/* ---------------- pointer ---------------- */
+const pointer = { x: -1e4, y: -1e4, vx: 0, vy: 0, px: -1e4, py: -1e4, active: false };
+window.addEventListener(
+  'pointermove',
+  (e) => {
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    pointer.active = true;
+  },
+  { passive: true }
+);
+root.addEventListener('pointerleave', () => {
+  pointer.active = false;
+});
 
 /* ---------------- boot ---------------- */
-function boot(peopleImg, canImg) {
-  if (booted) return;
-  booted = true;
+const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+withTimeout(
+  Promise.all([
+    document.fonts.load('400 100px "Instrument Serif"'),
+    document.fonts.load('italic 400 100px "Instrument Serif"'),
+    document.fonts.load('40px Norican'),
+    document.fonts.load('400 16px "Inter Tight Variable"'),
+  ]).catch(() => {}),
+  2500
+).then(boot);
 
-  const lenis = reduced ? null : new Lenis({ lerp: 0.09, smoothWheel: true, wheelMultiplier: 0.95 });
+function boot() {
+  const W0 = window.innerWidth;
+  const canvas = $('.drink__canvas');
+  const drinkEl = $('.drink');
+  const maxBubbles = small ? 2200 : 4200;
+  const scene = createScene(canvas, { maxBubbles });
+  root.classList.add(scene ? 'gl' : 'no-gl');
+
+  const surface = new Surface();
+  if (reduced) surface.calm = 0.35;
+  const bubbles = new Bubbles(maxBubbles, reduced ? 70 : small ? 150 : Math.round(clamp(W0 / 5, 180, 320)));
+  bubbles.onPop = (r) => sound.pop(r);
+
+  const lenis = reduced ? null : new Lenis({ lerp: 0.085, smoothWheel: true });
   if (lenis) {
-    lenis.stop();
     lenis.on('scroll', ScrollTrigger.update);
+    lenis.stop();
   }
 
-  // bottle extras: liquid mask + glint mask
-  const mask = `url(${maskUrl})`;
-  const fizzCanvas = $('.bottle__fizz');
-  fizzCanvas.style.webkitMaskImage = mask;
-  fizzCanvas.style.maskImage = mask;
-  const glint = $('.bottle__glint');
-  glint.style.webkitMaskImage = `url(${bottleUrl})`;
-  glint.style.maskImage = `url(${bottleUrl})`;
-
-  initPointer();
-  const fizz = new Fizz($('.fizz-layer'), { onPop: (r) => sound.pop(r) });
-  const hero = new Hero($('.hero'), { fizz, reduced });
-  const people = new Band($('.band--people'), peopleBand(peopleImg), { reduced });
-  const iconCfg = iconBand(canImg);
-  const icon = new Band($('.band--icon'), iconCfg, { reduced });
-  const create = new Band($('.band--create'), createBand($('.create')), { reduced });
-  const bands = [people, icon, create];
-  const strand = new Strand($('.site-footer'), { reduced });
-  const moment = new MomentMaker($('.band--create'), { fizz, reduced });
-  const menu = new Menu($('#menu'), $('.menu-btn'), { lenis, reduced });
-  const cursor = initCursor();
-
-  // the people band is on screen at load: it unfurls as part of the intro
-  people.gate = icon.gate = reduced ? 1 : 0;
-  create.gate = 1;
-
-  /* ---- "An icon, up close": scroll pushes the camera into the can ---- */
-  let sprayed = false;
-  iconCfg.beforeDraw = (b) => {
-    const pr = b.progress;
-    iconCfg.can.zoom = 1.02 + pr * 0.2;
-    iconCfg.can.focusX = 0.5 + pr * 0.08;
-    iconCfg.can.focusY = 0.48 - pr * 0.06;
+  const titleEl = $('.hero__title');
+  const footEl = $('.foot');
+  const state = {
+    t: 0,
+    scroll: 0,
+    surf: 0,
+    restSurf: 0,
+    level: reduced ? 0 : 1,
+    titleA: reduced ? 1 : 0,
+    pour: 0,
+    pourX: 0,
+    pourTop: 0,
+    flash: 0,
+    bottom: 1e6,
+    glow: 1,
+    dark: 0,
+    torchX: -999,
+    torchY: -999,
+    surface,
   };
-  iconCfg.can.after = (ctx, r, L) => {
-    // a specular glint sweeping across the aluminium as you scroll
-    const P = { x: 0, y: 0 };
-    r.centre(L.u0, P);
-    const xa = P.x;
-    r.centre(L.u1, P);
-    const xb = P.x;
-    const pos = xa + (xb - xa) * (icon.progress * 1.6 - 0.3);
-    const g = ctx.createLinearGradient(pos - 160, 0, pos + 160, 0);
-    g.addColorStop(0, 'rgba(255,255,255,0)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0.38)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.save();
-    ctx.globalCompositeOperation = 'soft-light';
-    ctx.fillStyle = g;
-    ctx.fillRect(pos - 160, -50, 320, b_h());
-    ctx.restore();
-  };
-  const b_h = () => icon.ch + 100;
-  iconCfg.afterUpdate = (b) => {
-    if (b.reveal > 0.93 && !sprayed && !reduced) {
-      sprayed = true;
-      // pssht — the can opens: spray from the opening
-      const pt = b.ribbon.imagePoint(iconCfg.can, 0.58, 0.42, { x: 0, y: 0 });
-      const c = b.clientPoint(pt.x, pt.y);
-      fizz.burst(c.x, c.y, 70, 1.25, { spread: Math.PI * 0.45, dir: -Math.PI / 2 - 0.25 });
-      sound.pssht();
-      b.ribbon.sim.impulse(0.3, -220, 0.08);
-    }
-    if (b.reveal < 0.3) sprayed = false;
-  };
+  let W = W0;
+  let H = window.innerHeight;
+  let dpr = 1;
+  let quality = 1;
 
-  /* ---- reveal section copy with split text ---- */
-  const revealCopy = (el) => {
-    if (reduced || el.dataset.revealed) return;
-    el.dataset.revealed = '1';
-    const title = el.querySelector('.band__title, .create__title');
-    const rest = [...el.querySelectorAll('.eyebrow, .link-arrow, .moods, .field, .create__actions, .card-stage')];
-    if (title) {
-      const split = SplitText.create(title, { type: 'lines,words', mask: 'lines' });
-      gsap.from(split.words, { yPercent: 110, duration: 1.1, ease: 'expo.out', stagger: 0.045 });
-    }
-    gsap.from(rest, { y: 24, opacity: 0, duration: 0.9, ease: 'power3.out', stagger: 0.08, delay: 0.15 });
-  };
-  bands.forEach((b) => (b.onShow = revealCopy));
+  const surfaceAt = (x) => state.surf - state.scroll - surface.height(x, state.t, W);
 
   /* ---- layout ---- */
   const layout = () => {
-    hero.layout();
-    bands.forEach((b) => b.layout());
-    // tuck the people band under the bottle, as in the poster
-    const g = people.g;
-    const mt = hero.bandTop() - hero.H - (g.height - g.T) / 2 - g.T * 0.035;
-    people.section.style.marginTop = `${mt.toFixed(1)}px`;
-    strand.layout();
-    fizz.resize();
-    menu.resize();
-    loader.resize();
-    moment.layout();
+    W = window.innerWidth;
+    H = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, (fine ? 1.5 : 1.25) * quality);
+    const sy = window.scrollY;
+    state.restSurf = titleWaterline(titleEl, 0.6);
+    state.bottom = footEl.getBoundingClientRect().top + sy - 34;
+    if (scene) {
+      scene.resize(W, H, dpr);
+      const heroH = $('.hero').offsetHeight;
+      scene.setTitle(paintTitle(titleEl, W, heroH, Math.min(2, window.devicePixelRatio || 1)), W, heroH);
+    }
   };
   layout();
-  let rt;
-  let lastW = window.innerWidth;
-  window.addEventListener('resize', () => {
-    clearTimeout(rt);
-    rt = setTimeout(() => {
-      // ignore mobile URL-bar height jitter
-      if (window.innerWidth === lastW && Math.abs(window.innerHeight - (hero.vh || 0)) < 120 && hero.vh) return;
-      lastW = window.innerWidth;
-      hero.vh = window.innerHeight;
-      layout();
-      ScrollTrigger.refresh();
-    }, 160);
-  });
-  hero.vh = window.innerHeight;
+  state.pourX = W * 0.6;
 
-  /* ---- scroll-driven state ---- */
-  bands.forEach((b) => {
-    ScrollTrigger.create({
-      trigger: b.section,
-      start: 'top 96%',
-      end: b === create ? 'top 40%' : 'top 34%',
-      onUpdate: (s) => (b.scrollReveal = s.progress),
-      onRefresh: (s) => (b.scrollReveal = s.progress),
-    });
-    ScrollTrigger.create({
-      trigger: b.section,
-      start: 'top bottom',
-      end: 'bottom top',
-      onUpdate: (s) => (b.progress = s.progress),
-      onRefresh: (s) => (b.progress = s.progress),
-    });
-  });
-  ScrollTrigger.create({
-    trigger: '.site-footer',
-    start: 'top 92%',
-    once: true,
-    onEnter: () => (reduced ? (strand.draw01 = 1) : gsap.to(strand, { draw01: 1, duration: 2.2, ease: 'power2.inOut' })),
-  });
-
-  /* ---- header state + active section ---- */
-  const header = $('.site-header');
-  const navRibbon = $('.primary-nav__ribbon');
-  const navLinks = $$('.primary-nav a');
-  let active = '';
-  const setActive = (id) => {
-    if (id === active) return;
-    active = id;
-    navLinks.forEach((a) => a.classList.toggle('is-active', a.dataset.nav === id));
-    const a = navLinks.find((l) => l.dataset.nav === id);
-    if (!a) return;
-    gsap.to(navRibbon, { x: a.offsetLeft, width: a.offsetWidth, opacity: 1, duration: reduced ? 0 : 0.7, ease: 'expo.out' });
+  /* ---- chapters ---- */
+  const shakeDrink = (p) => {
+    if (reduced || p <= 0.001) {
+      drinkEl.style.transform = '';
+      return;
+    }
+    const j = p * p * 9;
+    drinkEl.style.transform = `translate(${rand(-j, j).toFixed(1)}px, ${rand(-j, j).toFixed(1)}px)`;
   };
-  $$('[data-section]').forEach((sec) =>
+  const fizz = new FizzChapter($('.chapter--fizz'), {
+    reduced,
+    onPressure: (p) => {
+      bubbles.pressure = reduced ? 0 : p;
+      shakeDrink(p);
+      sound.rumble(p);
+    },
+    onBurst: (p, rect) => {
+      const n = Math.round((small ? 0.55 : 1) * (300 + 1500 * p));
+      bubbles.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, n * 0.35, 1.1 + p, { spread: Math.PI });
+      for (let k = 0; k < 8; k++) bubbles.burst((W * (k + 0.5)) / 8, H + 10, n * 0.08, 1.3 + p, { spread: 0.35, jx: W / 16 });
+      state.flash = 0.25 + 0.6 * p;
+      sound.pssht();
+    },
+  });
+  const shape = new ShapeChapter($('.chapter--shape'), {
+    reduced,
+    onFound: (x, y) => {
+      bubbles.burst(x, y, small ? 90 : 180, 0.9, { spread: 1.2 });
+      state.flash = 0.3;
+      sound.fizz(0.9);
+    },
+  });
+  const cap = new CapChapter($('.chapter--cap'), {
+    reduced,
+    onSeal: (x, y) => {
+      bubbles.burst(x, y, small ? 140 : 260, 1.1, { spread: Math.PI });
+      state.flash = 0.35;
+      sound.pssht();
+    },
+  });
+
+  /* ---- the pour ---- */
+  let pouring = false;
+  let pourAcc = 0;
+  const pour = () => {
+    if (reduced) {
+      state.level = 0;
+      state.titleA = 1;
+      return gsap.timeline();
+    }
+    pouring = true;
+    state.level = 1;
+    state.pour = 0;
+    state.pourTop = 0;
+    state.pourX = W * (0.56 + Math.random() * 0.08);
+    sound.pour(3);
+    const tl = gsap.timeline();
+    tl.to(state, { pour: 1, duration: 0.25, ease: 'power1.in' }, 0.1);
+    tl.to(state, { level: 0, duration: 2.9, ease: 'power2.out' }, 0.3);
+    tl.to(state, { titleA: 1, duration: 1.4, ease: 'power2.inOut' }, 0.9);
+    tl.to(state, { pourTop: () => surfaceAt(state.pourX) + 12, duration: 0.55, ease: 'power2.in' }, 2.75);
+    tl.call(() => {
+      pouring = false;
+      surface.kick(-24);
+    }, null, 3.25);
+    tl.set(state, { pour: 0 }, 3.3);
+    return tl;
+  };
+
+  /* ---- tilt (phones) ---- */
+  const tilt = createTilt(surface);
+  const hint = $('[data-hint]');
+  const hintText = $('.hint__text', hint);
+  if (!fine && tilt.supported) {
+    if (tilt.needsPermission) {
+      hintText.textContent = 'Tap to tilt the drink';
+      hint.dataset.action = 'tilt';
+      hint.addEventListener('click', async () => {
+        if (await tilt.enable()) {
+          hintText.textContent = 'Tilt your phone';
+          delete hint.dataset.action;
+        }
+      });
+    } else {
+      tilt.enable();
+      hintText.textContent = 'Tilt your phone';
+    }
+  } else if (!fine) hintText.textContent = 'Touch the drink';
+
+  /* ---- touching the drink ---- */
+  let lastRel = 0;
+  let rippleDist = 0;
+  window.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('a, button, input, label, .shape__stage')) return;
+    const sY = surfaceAt(e.clientX);
+    const rel = e.clientY - sY;
+    if (Math.abs(rel) < 90) surface.ripple(e.clientX, 12, state.t);
+    if (rel > 0 && !reduced) bubbles.burst(e.clientX, e.clientY, small ? 14 : 26, 0.6, { spread: Math.PI });
+    sound.fizz(0.3);
+  });
+
+  /* ---- reveals ---- */
+  $$('[data-reveal]').forEach((el) => {
+    if (reduced) return;
+    const split = SplitText.create(el, { type: 'lines', mask: 'lines', linesClass: 'line' });
+    gsap.from(split.lines, {
+      yPercent: 110,
+      filter: 'blur(8px)',
+      duration: 1.3,
+      ease: 'expo.out',
+      stagger: 0.09,
+      scrollTrigger: { trigger: el, start: 'top 86%', once: true },
+    });
+  });
+  if (!reduced) {
+    $$('.label, .shake-wrap, .capform, .shape__hint').forEach((el) =>
+      gsap.from(el, { y: 30, opacity: 0, duration: 1.1, ease: 'expo.out', clearProps: 'opacity,transform', scrollTrigger: { trigger: el, start: 'top 88%', once: true } })
+    );
+  }
+
+  /* ---- header + nav ---- */
+  const header = $('.site-header');
+  ScrollTrigger.create({ start: 60, end: 'max', onToggle: (s) => header.classList.toggle('is-scrolled', s.isActive) });
+  const navLinks = $$('.site-nav a');
+  ['fizz', 'shape', 'moment', 'find'].forEach((id) =>
     ScrollTrigger.create({
-      trigger: sec,
+      trigger: `#${id}`,
       start: 'top 55%',
       end: 'bottom 55%',
-      onToggle: (s) => s.isActive && setActive(sec.dataset.section),
+      onToggle: (s) => navLinks.forEach((a) => a.classList.toggle('is-active', s.isActive && a.getAttribute('href') === `#${id}`)),
     })
   );
-  ScrollTrigger.create({
-    start: 40,
-    end: 'max',
-    onToggle: (s) => header.classList.toggle('is-scrolled', s.isActive),
-  });
 
-  /* ---- anchors through Lenis ---- */
+  /* ---- anchors, sound, pour again ---- */
   document.addEventListener('click', (e) => {
     const a = e.target.closest('a[href^="#"]');
     if (!a) return;
@@ -252,142 +263,163 @@ function boot(peopleImg, canImg) {
     const target = id.length > 1 && document.querySelector(id);
     if (!target) return;
     e.preventDefault();
-    const offset = target.classList.contains('band') ? -40 : 0;
-    if (lenis) lenis.scrollTo(target, { offset, duration: 1.6, force: true });
+    if (lenis) lenis.scrollTo(target, { duration: 1.8 });
     else target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   });
-
-  /* ---- fizz on clicks and plucks ---- */
-  let lastPluck = 0;
-  onField('pluck', (item, x, y, k) => {
-    lastPluck = performance.now();
-    if (!reduced) fizz.burst(x, y, (26 * k) | 0, 0.8 + k * 0.4);
-    sound.pluck(k);
-    sound.fizz(0.35 * k);
-  });
-  window.addEventListener('click', (e) => {
-    if (performance.now() - lastPluck < 120 || reduced) return;
-    if (e.target.closest('input, textarea, label, .menu')) return;
-    fizz.burst(e.clientX, e.clientY, e.target.closest('a, button') ? 10 : 16, 0.6, { size: 0.8 });
-    sound.fizz(0.25);
-  });
-
-  /* ---- sound toggle ---- */
   const toggles = $$('.sound-toggle');
   const setSound = (on) => {
     sound.set(on);
-    toggles.forEach((st) => {
-      st.setAttribute('aria-pressed', String(on));
-      st.querySelector('.sound-toggle__label').textContent = on ? 'Sound on' : 'Sound off';
-      st.classList.toggle('is-on', on);
+    toggles.forEach((t) => {
+      t.setAttribute('aria-pressed', String(on));
+      t.classList.toggle('is-on', on);
+      t.querySelector('.sound-toggle__label').textContent = on ? 'Sound on' : 'Sound off';
     });
-    if (on) sound.fizz(0.6);
+    if (on) sound.fizz(0.7);
   };
-  toggles.forEach((st) => st.addEventListener('click', () => setSound(!sound.enabled)));
+  toggles.forEach((t) => t.addEventListener('click', () => setSound(!sound.enabled)));
+  $('[data-pour]').addEventListener('click', () => {
+    const go = () => pour();
+    if (lenis) lenis.scrollTo(0, { duration: 1.6, onComplete: go });
+    else {
+      window.scrollTo(0, 0);
+      go();
+    }
+  });
 
-  /* ---- hero headline: letters that react like bubbles ---- */
-  const title = $('.hero__title');
-  const split = SplitText.create(title, { type: 'chars,words' });
-  const chars = split.chars.map((el) => ({ el, x: 0, y: 0, lift: 0 }));
-  const measureChars = () => {
-    chars.forEach((c) => {
-      const r = c.el.getBoundingClientRect();
-      c.x = r.left + r.width / 2;
-      c.y = r.top + r.height / 2 + window.scrollY;
-    });
-  };
+  /* ---- gauge ---- */
+  const gauge = $('.gauge');
+  const marker = $('.gauge__marker');
+  const gaugeVal = $('.gauge__val');
 
-  /* ---- quality governor: step down resolution on devices that struggle ---- */
+  /* ---- resize ---- */
+  let rt;
+  let lastW = W;
+  let lastH = H;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      if (window.innerWidth === lastW && Math.abs(window.innerHeight - lastH) < 120) {
+        // phone URL bar: keep the canvas filling the screen, nothing else moves
+        H = window.innerHeight;
+        if (scene) scene.resize(W, H, dpr);
+        return;
+      }
+      lastW = window.innerWidth;
+      lastH = window.innerHeight;
+      layout();
+      ScrollTrigger.refresh();
+    }, 150);
+  });
+  ScrollTrigger.addEventListener('refresh', () => {
+    state.bottom = footEl.getBoundingClientRect().top + window.scrollY - 34;
+  });
+
+  /* ---- the loop ---- */
+  let lastScroll = window.scrollY;
   let slow = 0;
-  let lowered = false;
-  const govern = (deltaMs) => {
-    if (lowered || !charsLive || document.hidden || deltaMs > 250) return;
-    slow = slow * 0.98 + (deltaMs > 28 ? 1 : 0) * 0.02;
-    if (slow > 0.6) {
-      lowered = true;
-      Band.maxDpr = 1;
-      Hero.maxDpr = 1;
+  const shapeEl = $('.chapter--shape');
+  bubbles.seed({ W, H, surfaceAt, bottomY: state.bottom - state.scroll });
+
+  gsap.ticker.add((time, deltaMs) => {
+    const dt = Math.min(deltaMs / 1000, 1 / 20);
+    state.t = time;
+    if (lenis) lenis.raf(time * 1000);
+    state.scroll = window.scrollY;
+    const scrollDelta = state.scroll - lastScroll;
+    lastScroll = state.scroll;
+
+    // quality governor: if frames are consistently slow, render fewer pixels
+    if (deltaMs < 250) slow = slow * 0.97 + (deltaMs > 30 ? 0.03 : 0);
+    if (slow > 0.6 && quality > 0.67) {
+      quality = 0.67;
+      slow = 0;
       layout();
     }
-  };
 
-  /* ---- main loop ---- */
-  gsap.ticker.remove(preTick);
-  let charsLive = false;
-  gsap.ticker.add((time, deltaMs) => {
-    govern(deltaMs);
-    const dt = Math.min(deltaMs / 1000, 1 / 20);
-    if (lenis) lenis.raf(time * 1000);
-    const vel = lenis ? lenis.velocity : 0;
-    updateField(dt, time, vel);
-    loader.update(time);
-    hero.update(time, dt);
-    for (const b of bands) b.update(time, dt);
-    strand.update(time, dt);
-    moment.update(time, dt);
-    menu.update(time);
-    if (!reduced) {
-      fizz.update(dt);
-      fizz.draw();
-    }
-    cursor.update(dt);
-    if (charsLive && pointer.active) {
-      const sy = window.scrollY;
-      for (const c of chars) {
-        const dx = pointer.x - c.x;
-        const dy = pointer.y - (c.y - sy);
-        const d = Math.hypot(dx, dy);
-        const target = d < 140 ? (1 - d / 140) ** 2 : 0;
-        c.lift += (target - c.lift) * (1 - Math.exp(-dt * 10));
-        c.el.style.translate = `0 ${(-c.lift * 14).toFixed(2)}px`;
-        c.el.style.rotate = `${(c.lift * (dx > 0 ? -8 : 8)).toFixed(2)}deg`;
+    // the surface
+    const vel = lenis ? lenis.velocity : scrollDelta;
+    if (Math.abs(vel) > 0.5 && state.scroll < H * 1.2) surface.sloshV += clamp(vel, -50, 50) * 0.16;
+    surface.update(dt);
+    state.surf = state.restSurf + state.level * (H - state.restSurf + 120);
+    state.glow = 1 - clamp(state.scroll / H);
+
+    // pointer velocity, and the pointer breaking the surface
+    if (pointer.active && pointer.px > -1e3) {
+      const a = 1 - Math.exp(-dt * 25);
+      pointer.vx += ((pointer.x - pointer.px) / Math.max(dt, 1 / 240) - pointer.vx) * a;
+      pointer.vy += ((pointer.y - pointer.py) / Math.max(dt, 1 / 240) - pointer.vy) * a;
+      const sY = surfaceAt(pointer.x);
+      const rel = pointer.y - sY;
+      if (rel * lastRel < 0 && Math.abs(pointer.vy) > 60) {
+        surface.ripple(pointer.x, clamp(Math.abs(pointer.vy) * 0.012, 3, 14), state.t);
+        if (rel > 0 && !reduced) bubbles.burst(pointer.x, sY + 4, 14, 0.45, { dir: Math.PI / 2, spread: 0.9 });
       }
+      rippleDist += Math.hypot(pointer.x - pointer.px, pointer.y - pointer.py);
+      if (Math.abs(rel) < 24 && rippleDist > 48) {
+        rippleDist = 0;
+        surface.ripple(pointer.x, clamp(Math.hypot(pointer.vx, pointer.vy) * 0.004, 1.5, 6), state.t);
+      }
+      lastRel = rel;
+    } else {
+      pointer.vx = pointer.vy = 0;
+    }
+    pointer.px = pointer.x;
+    pointer.py = pointer.y;
+
+    // the pour keeps hitting the surface
+    if (pouring && state.pour > 0.5) {
+      pourAcc += dt;
+      if (pourAcc > 0.09) {
+        pourAcc = 0;
+        const sY = surfaceAt(state.pourX);
+        surface.ripple(state.pourX + rand(-6, 6), 8, state.t);
+        if (sY < H) bubbles.burst(state.pourX, sY + 6, small ? 4 : 7, 0.7, { dir: Math.PI / 2, spread: 0.6, jx: 6 });
+      }
+    }
+
+    // 02 — shape: the page goes dark around a warm torch
+    const sr = shapeEl.getBoundingClientRect();
+    const vis = 1 - clamp(Math.abs(sr.top + sr.height / 2 - H / 2) / (sr.height * 0.62));
+    shape.active = vis > 0;
+    if (!fine && shape.active) shape.scrollTorch(clamp((H * 0.7 - sr.top) / (sr.height * 0.75)), W, H);
+    else if (shape.active && pointer.active) shape.moveTo(pointer.x, pointer.y);
+    const targetDark = vis * (shape.found ? 0.4 : 0.92);
+    state.dark = damp(state.dark, targetDark, 4, dt);
+    const useP = fine && pointer.active;
+    state.torchX = damp(state.torchX, useP ? pointer.x : shape.screenTorch.x, 12, dt);
+    state.torchY = damp(state.torchY, useP ? pointer.y : shape.screenTorch.y, 12, dt);
+
+    fizz.update(dt);
+    shape.update(time, dt);
+    cap.update(time, dt, pointer);
+
+    state.flash = damp(state.flash, 0, 3.5, dt);
+    bubbles.update(dt, { W, H, scrollDelta, pointer, t: time, surfaceAt, bottomY: state.bottom - state.scroll });
+    if (scene) scene.render(state, bubbles);
+
+    // the measuring glass
+    if (gauge.offsetParent !== null) {
+      const max = Math.max(1, document.documentElement.scrollHeight - H);
+      const p = clamp(state.scroll / max);
+      marker.style.transform = `translateY(calc(${(p * gauge.offsetHeight).toFixed(1)}px - 50%))`;
+      gaugeVal.textContent = String(Math.round(p * 330));
     }
   });
   gsap.ticker.lagSmoothing(0);
 
   /* ---- intro ---- */
-  const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
-  loader.exit(tl, 0);
-  const at = reduced ? 0.2 : 0.75;
+  const heroBits = ['.site-header', '.hero__kicker', '.hero__below', '.hint', '.gauge'];
   if (reduced) {
-    hero.carb.on = false;
-    tl.call(() => lenis && lenis.start(), null, at);
+    pour();
   } else {
-    tl.from('.site-header > *', { y: -30, opacity: 0, duration: 1, stagger: 0.08 }, at + 0.2);
-    tl.from(split.chars, {
-      yPercent: 120,
-      opacity: 0,
-      rotate: () => rand(-18, 18),
-      filter: 'blur(6px)',
-      duration: 1.1,
-      ease: 'back.out(2.2)',
-      stagger: { each: 0.028, from: 'random' },
-      clearProps: 'filter',
-    }, at + 0.25);
-    tl.from('.hero__sub', { y: 18, opacity: 0, duration: 1 }, at + 0.75);
-    tl.from('.hero .link-arrow', { y: 18, opacity: 0, duration: 1 }, at + 0.85);
-    tl.from('.scroll-cue', { y: 18, opacity: 0, duration: 1 }, at + 1.0);
-    hero.intro(tl, at, {
-      onLand: (cap) => {
-        fizz.burst(cap.x, cap.y, 54, 1.05, { spread: Math.PI * 0.35, lifeMul: 1.3 });
-        sound.fizz(0.9);
-      },
-    });
-    tl.to(people, { gate: 1, duration: 2.2, ease: 'power2.inOut' }, at + 0.9);
-    tl.to(icon, { gate: 1, duration: 2, ease: 'power2.inOut' }, at + 1.5);
-    tl.call(() => {
-      lenis && lenis.start();
-      measureChars();
-      charsLive = true;
-    }, null, at + 1.6);
-    // a glint sweeps the bottle now and then
-    const sweep = () => gsap.fromTo(glint, { '--glint': '130%' }, { '--glint': '-30%', duration: 1.6, ease: 'power2.inOut', onComplete: () => gsap.delayedCall(rand(4, 7), sweep) });
-    tl.call(sweep, null, at + 1.2);
+    gsap.set(heroBits, { opacity: 0 });
+    const tl = pour();
+    tl.to('.site-header', { opacity: 1, duration: 1.2, ease: 'power2.out' }, 1.2);
+    tl.fromTo('.hero__kicker', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 1.2, ease: 'expo.out' }, 1.6);
+    tl.fromTo('.hero__below', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 1.4, ease: 'expo.out' }, 2.4);
+    tl.to(['.hint', '.gauge'], { opacity: 1, duration: 1.2 }, 2.9);
+    tl.call(() => lenis && lenis.start(), null, 2.6);
   }
-  window.addEventListener('resize', () => charsLive && setTimeout(measureChars, 400));
-  ScrollTrigger.addEventListener('refresh', () => charsLive && measureChars());
 
-  // expose for debugging in the console
-  window.__ftf = { hero, bands, strand, moment, menu, fizz, lenis, sound };
+  window.__fir = { state, surface, bubbles, scene, lenis, pour, shape, cap, fizz, sound };
 }

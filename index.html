@@ -3,209 +3,128 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Follow the Feeling</title>
-    <meta name="description" content="One familiar taste. A world of moments. An independent, interactive design concept where every ribbon on the page is alive." />
-    <meta name="theme-color" content="#e4101f" />
+    <title>Feel It Rise</title>
+    <meta name="description" content="An independent, interactive concept: a site poured into a glass of Coca-Cola. Touch the surface, shake the bottle, find the shape in the dark and seal a moment under the cap." />
+    <meta name="theme-color" content="#120504" />
     <script>document.documentElement.classList.replace('no-js', 'js');</script>
   </head>
-  <body class="is-loading">
-    <a class="skip-link" href="#main">Skip to content</a>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
 
-    <!-- Preloader: the whole screen is a red label that flips away -->
-    <div class="loader" aria-hidden="true">
-      <canvas class="loader__canvas"></canvas>
-      <div class="loader__inner">
-        <span class="wordmark loader__mark">Coca-Cola</span>
-        <span class="loader__count"><span data-count>00</span></span>
-      </div>
-    </div>
-
-    <canvas class="fizz-layer" aria-hidden="true"></canvas>
-
-    <div class="cursor" aria-hidden="true">
-      <div class="cursor__ring"><span class="cursor__label"></span></div>
-      <div class="cursor__dot"></div>
-    </div>
+    <!-- the drink: one WebGL canvas behind everything -->
+    <div class="drink" aria-hidden="true"><canvas class="drink__canvas"></canvas></div>
 
     <header class="site-header">
-      <a class="brand" href="#open" aria-label="Coca-Cola — back to top"><span class="wordmark">Coca-Cola</span></a>
-      <nav class="primary-nav" aria-label="Sections">
-        <ol>
-          <li><a href="#open" data-nav="open"><span class="num">01</span> Open</a></li>
-          <li class="sep" aria-hidden="true">/</li>
-          <li><a href="#explore" data-nav="explore"><span class="num">02</span> Explore</a></li>
-          <li class="sep" aria-hidden="true">/</li>
-          <li><a href="#create" data-nav="create"><span class="num">03</span> Create</a></li>
-          <li class="sep" aria-hidden="true">/</li>
-          <li><a href="#find" data-nav="find"><span class="num">04</span> Find</a></li>
-        </ol>
-        <span class="primary-nav__ribbon" aria-hidden="true"></span>
+      <a class="brand wordmark" href="#top" aria-label="Coca-Cola — back to the surface">Coca-Cola</a>
+      <nav class="site-nav" aria-label="Chapters">
+        <a href="#fizz"><span>01</span> Fizz</a>
+        <a href="#shape"><span>02</span> Shape</a>
+        <a href="#moment"><span>03</span> Moment</a>
+        <a href="#find"><span>04</span> Find</a>
       </nav>
-      <span class="site-header__rule" aria-hidden="true"></span>
-      <button class="sound-toggle" type="button" aria-pressed="false" aria-label="Fizz sound">
+      <button class="sound-toggle" type="button" aria-pressed="false">
         <span class="sound-toggle__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
         <span class="sound-toggle__label">Sound off</span>
       </button>
-      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu">
-        <span class="menu-btn__label">Menu</span>
-        <span class="menu-btn__icon" aria-hidden="true"><i></i><i></i><i></i></span>
-      </button>
     </header>
 
+    <!-- a measuring glass along the edge: how far down you are -->
+    <div class="gauge" aria-hidden="true">
+      <div class="gauge__scale"></div>
+      <div class="gauge__marker"><span class="gauge__val">0</span><small>ml</small></div>
+    </div>
+
     <main id="main">
-      <!-- 01 · Open -->
-      <section class="hero" id="open" data-section="open" aria-labelledby="hero-title">
-        <canvas class="hero__ribbon" aria-hidden="true"></canvas>
-
-        <div class="hero__copy">
-          <h1 class="hero__title" id="hero-title">Follow the feeling.</h1>
-          <p class="hero__sub">One familiar taste. <span class="hero__sub-line">A world of moments.</span></p>
-          <a class="link-arrow" href="#explore">Open the experience
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg>
+      <section class="hero" id="top" aria-labelledby="title">
+        <p class="hero__kicker">Coca-Cola <span>·</span> an independent concept</p>
+        <h1 class="hero__title" id="title"><span class="w">Feel</span> <span class="w">it</span> <em class="w">rise.</em></h1>
+        <div class="hero__below">
+          <p class="hero__lede">Ice-cold Coca-Cola, poured for the moments worth feeling.</p>
+          <a class="dive" href="#fizz">Dive in
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m0 0-6-6m6 6 6-6" /></svg>
           </a>
         </div>
-
-        <div class="bottle">
-          <div class="bottle__inner">
-            <img src="./src/assets/bottle.webp" width="412" height="868" alt="An ice-cold glass bottle of Coca-Cola, beaded with condensation" fetchpriority="high" />
-            <canvas class="bottle__fizz" aria-hidden="true"></canvas>
-            <span class="bottle__glint" aria-hidden="true"></span>
-          </div>
-        </div>
-
-        <nav class="ribbon-nav" aria-label="Experience">
-          <a href="#explore" data-f="0.37">Explore <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a>
-          <a href="#find" data-f="0.62">Share <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a>
-          <a href="#create" data-f="0.85">Create <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a>
-        </nav>
-
-        <a class="scroll-cue" href="#explore" aria-label="Scroll to explore">
-          <span class="scroll-cue__mouse" aria-hidden="true"><i></i></span>
-          <span class="scroll-cue__label">Scroll</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-        </a>
+        <button class="hint" type="button" data-hint>
+          <span class="hint__ring" aria-hidden="true"></span>
+          <span class="hint__text">Touch the surface</span>
+        </button>
       </section>
 
-      <!-- 02 · Explore — the people -->
-      <section class="band band--people" id="explore" data-section="explore" aria-labelledby="people-title">
-        <canvas class="band__canvas" role="img" aria-label="Three friends laughing around an outdoor table with bottles and cans of Coca-Cola"></canvas>
-        <div class="band__copy band__copy--light" data-follow data-u="0.06">
-          <span class="eyebrow">01</span>
-          <h2 class="band__title" id="people-title">The people make the moment.</h2>
+      <section class="chapter chapter--fizz" id="fizz" aria-labelledby="fizz-title">
+        <div class="chapter__text">
+          <p class="label">01 — Fizz</p>
+          <h2 id="fizz-title" data-reveal>It starts with <em>a&nbsp;hiss.</em></h2>
+          <p class="body" data-reveal>Every bottle holds a small storm, sealed under pressure. Crack the cap and it lets go: thousands of bubbles racing for the surface, the cold, bright crackle you hear before you taste a thing.</p>
         </div>
+        <div class="shake-wrap">
+          <button class="shake" type="button" aria-describedby="shake-help">
+            <svg class="shake__ring" viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="shake__track" cx="60" cy="60" r="54" />
+              <circle class="shake__fill" cx="60" cy="60" r="54" />
+            </svg>
+            <span class="shake__label">Hold to shake</span>
+          </button>
+          <p class="shake__help" id="shake-help">Press and hold. Let go when you dare.</p>
+        </div>
+        <p class="pssht" aria-hidden="true">Pssht.</p>
       </section>
 
-      <!-- An icon, up close -->
-      <section class="band band--icon" id="icon" data-section="explore" aria-labelledby="icon-title">
-        <canvas class="band__canvas" role="img" aria-label="Extreme close-up of an opened, ice-cold can of Coca-Cola covered in droplets"></canvas>
-        <div class="band__copy band__copy--dark" data-follow data-u="0.7">
-          <span class="eyebrow">02</span>
-          <h2 class="band__title" id="icon-title">An icon, up close.</h2>
-          <a class="link-arrow" href="#create">Explore the drink
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg>
-          </a>
+      <section class="chapter chapter--shape" id="shape" aria-labelledby="shape-title">
+        <div class="chapter__text">
+          <p class="label">02 — Shape</p>
+          <h2 id="shape-title" data-reveal>Made to be known <em>in the dark.</em></h2>
+          <p class="body" data-reveal>In 1915 the brief was simple and nearly impossible: a bottle you could recognise by touch alone, in the dark — even lying broken on the ground.</p>
+          <p class="shape__hint"><span class="only-fine">Move your cursor through the dark. Feel for it.</span><span class="only-coarse">Keep scrolling, or drag across the dark. Feel for it.</span></p>
+          <p class="shape__found" aria-live="polite"></p>
+        </div>
+        <div class="shape__stage">
+          <div class="shape__bottle" role="img" aria-label="The contour bottle, outlined in light"></div>
         </div>
       </section>
 
-      <!-- 03 · Create -->
-      <section class="band band--create" id="create" data-section="create" aria-labelledby="create-title">
-        <canvas class="band__canvas" aria-hidden="true"></canvas>
-        <div class="create" data-follow data-u="0.5" data-no-grab>
-          <form class="create__form" novalidate>
-            <h2 class="create__title" id="create-title">Make a little moment yours.</h2>
-
+      <section class="chapter chapter--cap" id="moment" aria-labelledby="cap-title">
+        <div class="chapter__text">
+          <p class="label">03 — Moment</p>
+          <h2 id="cap-title" data-reveal>Seal <em>a moment.</em></h2>
+          <p class="body" data-reveal>Write the line you’d keep under the cap. Twenty-one crimps, one line, yours.</p>
+          <form class="capform" novalidate>
             <fieldset class="moods">
-              <legend>Choose a mood</legend>
-              <div class="moods__row">
-                <span class="moods__pill" aria-hidden="true"></span>
-                <label class="mood">
-                  <input type="radio" name="mood" value="celebrating" checked />
-                  <span>Celebrating</span>
-                  <svg class="mood__check" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.5 6.2 12 13.5 4" /></svg>
-                </label>
-                <label class="mood">
-                  <input type="radio" name="mood" value="catching-up" />
-                  <span>Catching up</span>
-                  <svg class="mood__check" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.5 6.2 12 13.5 4" /></svg>
-                </label>
-                <label class="mood">
-                  <input type="radio" name="mood" value="break" />
-                  <span>Taking a break</span>
-                  <svg class="mood__check" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.5 6.2 12 13.5 4" /></svg>
-                </label>
-              </div>
+              <legend>Mood</legend>
+              <label class="chip"><input type="radio" name="mood" value="celebrate" checked /><span>Celebrate</span></label>
+              <label class="chip"><input type="radio" name="mood" value="catch-up" /><span>Catch up</span></label>
+              <label class="chip"><input type="radio" name="mood" value="pause" /><span>Pause</span></label>
             </fieldset>
-
             <label class="field">
-              <span class="field__label">Write a line</span>
-              <input type="text" name="line" maxlength="44" value="Here’s to the little wins." autocomplete="off" spellcheck="false" />
+              <span class="field__label">Your line</span>
+              <input type="text" name="line" maxlength="26" value="Here’s to us" autocomplete="off" spellcheck="false" />
             </label>
-
-            <div class="create__actions">
-              <button class="btn" type="submit">
-                <span>Create your moment</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg>
-              </button>
-              <p class="create__status" role="status" aria-live="polite"></p>
+            <div class="capform__actions">
+              <button class="btn" type="submit"><span>Seal it</span></button>
+              <p class="capform__status" role="status" aria-live="polite"></p>
             </div>
           </form>
-
-          <div class="card-stage">
-            <figure class="moment-card" data-mood="celebrating" aria-label="Preview of your moment card">
-              <div class="moment-card__flip">
-                <svg class="moment-card__waves" viewBox="0 0 400 250" preserveAspectRatio="none" aria-hidden="true">
-                  <path class="w-top" />
-                  <path class="w-top-line" />
-                  <path class="w-bot" />
-                  <path class="w-bot-line" />
-                </svg>
-                <span class="wordmark moment-card__mark" aria-hidden="true">Coca-Cola</span>
-                <blockquote class="moment-card__line"><p></p></blockquote>
-                <span class="moment-card__glare" aria-hidden="true"></span>
-              </div>
-            </figure>
-          </div>
+        </div>
+        <div class="cap-stage">
+          <span class="cap-wave" aria-hidden="true"></span>
+          <div class="cap-float"><div class="cap" role="img"></div></div>
         </div>
       </section>
     </main>
 
-    <!-- 04 · Find -->
-    <footer class="site-footer" id="find" data-section="find">
-      <canvas class="footer__ribbon" aria-hidden="true"></canvas>
-      <div class="site-footer__row">
-        <p class="site-footer__lead">Keep the moment going.</p>
-        <span class="site-footer__rule" aria-hidden="true"></span>
-        <ul class="site-footer__links">
-          <li><a class="link-arrow link-arrow--quiet" href="#icon">Explore the drinks <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a></li>
-          <li><a class="link-arrow link-arrow--quiet" href="#icon">Product information <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a></li>
-          <li><a class="link-arrow link-arrow--quiet" href="#find">Business enquiries <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17m0 0-6-6m6 6-6 6" /></svg></a></li>
+    <footer class="foot" id="find" aria-labelledby="find-title">
+      <svg class="foot__edge" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C 240 6 480 58 720 30 S 1200 4 1440 28 V 60 H 0 Z" /></svg>
+      <div class="foot__inner">
+        <p class="label">04 — Find</p>
+        <h2 id="find-title">Ice-cold, <em>wherever you are.</em></h2>
+        <ul class="foot__actions">
+          <li><button type="button" class="pill" data-pour>Pour another</button></li>
+          <li><a class="pill" href="#top">Back to the surface ↑</a></li>
+          <li><button type="button" class="pill sound-toggle" aria-pressed="false"><span class="sound-toggle__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="sound-toggle__label">Sound off</span></button></li>
         </ul>
-        <div class="site-footer__brand">
-          <span class="wordmark">Coca-Cola</span>
-          <small>Independent design concept · 2026</small>
-        </div>
+        <p class="foot__mark wordmark" aria-hidden="true">Coca-Cola</p>
+        <p class="foot__fine">Independent design concept · 2026. Not affiliated with or endorsed by The Coca-Cola Company.</p>
       </div>
     </footer>
-
-    <!-- Full-screen menu -->
-    <div class="menu" id="menu" hidden>
-      <canvas class="menu__canvas" aria-hidden="true"></canvas>
-      <nav class="menu__nav" aria-label="Menu">
-        <ol>
-          <li data-menu-item><a href="#open"><span class="num">01</span>Open</a></li>
-          <li data-menu-item><a href="#explore"><span class="num">02</span>Explore</a></li>
-          <li data-menu-item><a href="#create"><span class="num">03</span>Create</a></li>
-          <li data-menu-item><a href="#find"><span class="num">04</span>Find</a></li>
-        </ol>
-        <div class="menu__foot" data-menu-item>
-          <p>Follow the feeling. <span>Tip: grab any ribbon and pull.</span></p>
-          <button class="sound-toggle sound-toggle--menu" type="button" aria-pressed="false" aria-label="Fizz sound">
-            <span class="sound-toggle__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-            <span class="sound-toggle__label">Sound off</span>
-          </button>
-        </div>
-      </nav>
-    </div>
 
     <script type="module" src="./src/main.js"></script>
   </body>

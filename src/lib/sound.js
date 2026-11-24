@@ -89,6 +89,42 @@ export const sound = {
     lastPop = now;
     noiseBurst({ dur: 0.02, freq: 3000 + 9000 / (r + 1), q: 4, gain: 0.03 });
   },
+  /** a low rumble that follows how hard the bottle is being shaken (0..1) */
+  rumble(p) {
+    if (!ac) return;
+    if (!enabled) p = 0;
+    if (!this._rum && p > 0) {
+      const src = ac.createBufferSource();
+      src.buffer = noise;
+      src.loop = true;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 220;
+      f.Q.value = 3;
+      const g = ac.createGain();
+      g.gain.value = 0;
+      src.connect(f).connect(g).connect(master);
+      src.start();
+      this._rum = { src, f, g };
+    }
+    if (this._rum) {
+      const now = ac.currentTime;
+      this._rum.g.gain.setTargetAtTime(p * 0.55, now, 0.05);
+      this._rum.f.frequency.setTargetAtTime(160 + p * 520, now, 0.05);
+      if (p <= 0.001) {
+        const r = this._rum;
+        this._rum = null;
+        setTimeout(() => r.src.stop(), 300);
+      }
+    }
+  },
+  pour(seconds = 2.6) {
+    if (!enabled || !ensure()) return;
+    const f = noiseBurst({ dur: seconds, freq: 700, type: 'bandpass', q: 0.7, gain: 0.16, attack: 0.25 });
+    f.frequency.setValueAtTime(500, ac.currentTime);
+    f.frequency.linearRampToValueAtTime(1400, ac.currentTime + seconds);
+    this.fizz(0.7);
+  },
   pluck(strength = 1) {
     if (!enabled || !ensure()) return;
     // a soft satin "whump" — low filtered noise sweep
